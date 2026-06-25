@@ -87,6 +87,8 @@ sc.render.engine = "BLENDER_EEVEE_NEXT" if "BLENDER_EEVEE_NEXT" in engs else "BL
 sc.render.film_transparent = False
 sc.render.resolution_x = {knobs.resolution}
 sc.render.resolution_y = {knobs.resolution}
-sc.render.filepath = "out.png"
+# absolute path: Blender resolves a bare relative filepath against the .blend
+# location (unsaved here), which fails; cwd is the per-run scratch dir.
+sc.render.filepath = __import__("os").path.abspath("out.png")
 bpy.ops.render.render(write_still=True)
 '''
