@@ -25,3 +25,9 @@ def test_render_success(tmp_path, monkeypatch):
 def test_image_404_before_render(monkeypatch):
     srv._state["image_path"] = None
     assert TestClient(app).get("/image").status_code == 404
+
+def test_style_maps_nl(monkeypatch):
+    monkeypatch.setattr(srv.brain, "nl_to_knobs",
+                        lambda text: {"material": "metal", "background": "dark"})
+    r = TestClient(app).post("/style", json={"text": "industrial metal dark"})
+    assert r.json()["material"] == "metal" and r.json()["background"] == "dark"

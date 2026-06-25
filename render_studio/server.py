@@ -4,8 +4,9 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
+from pydantic import BaseModel
 
-from . import ingest, render, scene
+from . import brain, ingest, render, scene
 from .knobs import coerce
 from .render import DEFAULT_SCRATCH
 
@@ -34,6 +35,16 @@ def image() -> FileResponse:
         raise HTTPException(status_code=404, detail="no render yet")
     return FileResponse(_state["image_path"], media_type="image/png")
 
+
+class StyleReq(BaseModel):
+    text: str
+
+@app.post("/style")
+def style(req: StyleReq) -> dict:
+    raw = brain.nl_to_knobs(req.text)
+    k = coerce(raw)
+    return {"material": k.material, "color": k.color, "background": k.background,
+            "angle": k.angle, "resolution": k.resolution}
 
 @app.post("/render")
 async def do_render(
