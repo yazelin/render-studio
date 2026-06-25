@@ -19,7 +19,7 @@ def build_bpy(mesh_path: str, knobs: Knobs) -> str:
     import_call = IMPORT_OPS[ext].format(path=mesh_path)
     metallic, roughness = MATERIALS[knobs.material]
     r, g, b = _hex_to_rgb(knobs.color)
-    bg = BACKGROUNDS[knobs.background]
+    bg_top, bg_bot = BACKGROUNDS[knobs.background]
     cam_dir = ANGLES[knobs.angle]
     return f'''import bpy, mathutils
 
@@ -59,13 +59,14 @@ floor = bpy.context.active_object
 floor.is_shadow_catcher = True
 
 # ---- 3-point area lights, scaled to subject ----
-def area(name, offset, energy):
-    l = bpy.data.lights.new(name, "AREA"); l.size = radius * 4
+def area(name, offset, energy, size=4):
+    l = bpy.data.lights.new(name, "AREA"); l.size = radius * size
     l.energy = energy * (radius ** 2)
     ob = bpy.data.objects.new(name, l)
     ob.location = center + mathutils.Vector(offset) * radius
+    ob.rotation_euler = (center - ob.location).to_track_quat("-Z", "Y").to_euler()
     bpy.context.collection.objects.link(ob)
-area("key", (4, -4, 6), 60); area("fill", (-5, -2, 3), 20); area("rim", (0, 5, 4), 30)
+area("key", (4, -4, 6), 120, 5); area("fill", (-5, -2, 3), 35, 6); area("rim", (0, 6, 5), 70, 4)
 
 # ---- camera framing the subject ----
 CAM_DIR = {cam_dir}
@@ -75,10 +76,20 @@ cam.location = center + mathutils.Vector(CAM_DIR).normalized() * radius * 3.2
 cam.rotation_euler = (center - cam.location).to_track_quat("-Z", "Y").to_euler()
 bpy.context.scene.camera = cam
 
-# ---- world background ----
+# ---- world: vertical gradient (top {bg_top} -> bottom {bg_bot}) so reflective
+#      materials have an environment to reflect ----
 world = bpy.data.worlds.new("w"); bpy.context.scene.world = world
 world.use_nodes = True
-world.node_tree.nodes["Background"].inputs[0].default_value = ({bg[0]}, {bg[1]}, {bg[2]}, 1.0)
+_nt = world.node_tree
+_bg = _nt.nodes["Background"]; _bg.inputs[1].default_value = 0.5
+_tc = _nt.nodes.new("ShaderNodeTexCoord")
+_grad = _nt.nodes.new("ShaderNodeTexGradient")
+_ramp = _nt.nodes.new("ShaderNodeValToRGB")
+_ramp.color_ramp.elements[0].color = ({bg_bot[0]}, {bg_bot[1]}, {bg_bot[2]}, 1.0)
+_ramp.color_ramp.elements[1].color = ({bg_top[0]}, {bg_top[1]}, {bg_top[2]}, 1.0)
+_nt.links.new(_tc.outputs["Generated"], _grad.inputs["Vector"])
+_nt.links.new(_grad.outputs["Color"], _ramp.inputs["Fac"])
+_nt.links.new(_ramp.outputs["Color"], _bg.inputs[0])
 
 # ---- render EEVEE ----
 sc = bpy.context.scene

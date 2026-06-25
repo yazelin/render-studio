@@ -3,8 +3,15 @@ from dataclasses import dataclass
 
 MATERIALS = {"matte": (0.0, 0.9), "plastic": (0.0, 0.4),
              "metal": (0.9, 0.3), "clay": (0.0, 0.7)}  # (metallic, roughness)
-BACKGROUNDS = {"white": (0.9, 0.9, 0.9), "grey": (0.6, 0.6, 0.6),
-               "dark": (0.05, 0.05, 0.06), "gradient": (0.6, 0.6, 0.6)}
+# each background is a (top_rgb, bottom_rgb) gradient: the world is always a
+# gradient so reflective (metal) materials have something to reflect and read as
+# metal instead of going flat/black. The pair sets the overall tone.
+BACKGROUNDS = {
+    "white": ((0.95, 0.95, 0.96), (0.78, 0.78, 0.80)),
+    "grey": ((0.85, 0.87, 0.90), (0.33, 0.34, 0.37)),
+    "dark": ((0.30, 0.30, 0.33), (0.03, 0.03, 0.04)),
+    "gradient": ((0.90, 0.91, 0.95), (0.07, 0.07, 0.11)),
+}
 # camera direction (unit-ish, scaled by model radius at render time)
 ANGLES = {"front": (0.0, -1.0, 0.15), "iso": (1.0, -1.0, 0.8),
           "top_front": (0.0, -0.7, 1.2), "back": (0.0, 1.0, 0.3)}
