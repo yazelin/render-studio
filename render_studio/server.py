@@ -14,6 +14,8 @@ app = FastAPI()
 WEB = Path(__file__).parent / "web"
 _state: dict = {"image_path": None}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+# shared handoff with the cad-agent modeling app: it writes its latest STL here
+HANDOFF_STL = Path.home() / "3d-pipeline" / "latest.stl"
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -35,6 +37,18 @@ def image() -> FileResponse:
     if not _state["image_path"]:
         raise HTTPException(status_code=404, detail="no render yet")
     return FileResponse(_state["image_path"], media_type="image/png")
+
+
+@app.get("/handoff")
+def handoff() -> dict:
+    return {"available": HANDOFF_STL.exists()}
+
+
+@app.get("/handoff-file")
+def handoff_file() -> FileResponse:
+    if not HANDOFF_STL.exists():
+        raise HTTPException(status_code=404, detail="no cad-agent model yet")
+    return FileResponse(HANDOFF_STL, media_type="model/stl", filename="cad-agent.stl")
 
 
 class StyleReq(BaseModel):

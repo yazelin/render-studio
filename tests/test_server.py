@@ -51,3 +51,15 @@ def test_render_file_too_large_returns_400(monkeypatch):
         data={"material": "metal"})
     assert r.status_code == 400
     assert "too large" in r.json()["detail"]
+
+
+def test_handoff_status_and_file(tmp_path, monkeypatch):
+    h = tmp_path / "latest.stl"
+    monkeypatch.setattr(srv, "HANDOFF_STL", h)
+    c = TestClient(app)
+    assert c.get("/handoff").json() == {"available": False}
+    assert c.get("/handoff-file").status_code == 404
+    h.write_text("solid x")
+    assert c.get("/handoff").json() == {"available": True}
+    r = c.get("/handoff-file")
+    assert r.status_code == 200 and r.content == b"solid x"

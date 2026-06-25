@@ -14,6 +14,7 @@
 <div id="panel">
   <label>3D file (stl/obj/gltf/glb/ply/step)</label>
   <input type="file" id="file">
+  <button id="loadHandoff" title="載入 cad-agent 最近建好的模型">載入 cad-agent 最新模型</button>
   <label>material</label>
   <select id="material"><option>matte</option><option>plastic</option><option>metal</option><option>clay</option></select>
   <label>color</label>
@@ -35,6 +36,18 @@ const $ = id => document.getElementById(id);
 const KNOBS = ["material","color","background","angle","resolution"];
 function status(t){ $("status").textContent = t; }
 
+// model handed off from cad-agent (used when no file is manually picked)
+let handoffFile = null;
+$("loadHandoff").onclick = async () => {
+  status("loading from cad-agent...");
+  const r = await fetch("/handoff-file");
+  if (!r.ok) { status("no cad-agent model yet - build one there first"); return; }
+  const blob = await r.blob();
+  handoffFile = new File([blob], "cad-agent.stl", {type: "model/stl"});
+  $("file").value = "";  // manual picker cleared; handoff takes over
+  status("loaded cad-agent model - pick knobs and render");
+};
+
 $("applyStyle").onclick = async () => {
   const text = $("style").value.trim(); if (!text) return;
   status("asking claude...");
@@ -46,8 +59,8 @@ $("applyStyle").onclick = async () => {
 };
 
 $("render").onclick = async () => {
-  const f = $("file").files[0];
-  if (!f) { status("pick a file first"); return; }
+  const f = $("file").files[0] || handoffFile;
+  if (!f) { status("pick a file (or load from cad-agent) first"); return; }
   const fd = new FormData();
   fd.append("model", f);
   for (const key of KNOBS) fd.append(key, $(key).value);
