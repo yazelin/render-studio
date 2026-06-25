@@ -35,7 +35,10 @@ def nl_to_knobs(text: str, *, claude_cmd: list[str] | None = None,
                 timeout: float = 60) -> dict:
     prompt = build_prompt(text)
     cmd = claude_cmd or DEFAULT_CLAUDE_CMD
-    with tempfile.TemporaryDirectory(prefix="render-studio-brain-") as cwd:
-        proc = subprocess.run(cmd, input=prompt, cwd=cwd, capture_output=True,
-                              text=True, timeout=timeout)
-    return parse_knobs(proc.stdout)
+    try:
+        with tempfile.TemporaryDirectory(prefix="render-studio-brain-") as cwd:
+            proc = subprocess.run(cmd, input=prompt, cwd=cwd, capture_output=True,
+                                  text=True, timeout=timeout)
+        return parse_knobs(proc.stdout)
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return {}

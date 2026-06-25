@@ -31,3 +31,23 @@ def test_style_maps_nl(monkeypatch):
                         lambda text: {"material": "metal", "background": "dark"})
     r = TestClient(app).post("/style", json={"text": "industrial metal dark"})
     assert r.json()["material"] == "metal" and r.json()["background"] == "dark"
+
+def test_render_blender_error_returns_400(tmp_path, monkeypatch):
+    # I2: run_blender raising FileNotFoundError must return 400, not 500
+    monkeypatch.setattr(srv.ingest, "prepare_mesh", lambda src, wd, **k: src)
+    monkeypatch.setattr(srv.scene, "build_bpy", lambda mesh, knobs: "SCRIPT")
+    monkeypatch.setattr(srv.render, "run_blender",
+        lambda script, **k: (_ for _ in ()).throw(FileNotFoundError("blender not found")))
+    r = TestClient(app).post("/render",
+        files={"model": ("a.stl", io.BytesIO(b"solid x"), "application/octet-stream")},
+        data={"material": "metal"})
+    assert r.status_code == 400
+
+def test_render_file_too_large_returns_400(monkeypatch):
+    # I3: file exceeding MAX_UPLOAD_BYTES must return 400
+    monkeypatch.setattr(srv, "MAX_UPLOAD_BYTES", 4)
+    r = TestClient(app).post("/render",
+        files={"model": ("a.stl", io.BytesIO(b"1234567"), "application/octet-stream")},
+        data={"material": "metal"})
+    assert r.status_code == 400
+    assert "too large" in r.json()["detail"]

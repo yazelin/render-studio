@@ -13,6 +13,7 @@ from .render import DEFAULT_SCRATCH
 app = FastAPI()
 WEB = Path(__file__).parent / "web"
 _state: dict = {"image_path": None}
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -64,16 +65,21 @@ async def do_render(
             "resolution": resolution,
         }
     )
+    data = await model.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail="file too large (max 50 MB)")
     workdir = DEFAULT_SCRATCH / ("upload-" + uuid.uuid4().hex[:12])
     workdir.mkdir(parents=True, exist_ok=True)
-    src = workdir / Path(model.filename).name
-    src.write_bytes(await model.read())
+    src = workdir / Path(model.filename or "upload.bin").name
+    src.write_bytes(data)
     try:
         mesh = ingest.prepare_mesh(src, workdir)
         script = scene.build_bpy(str(mesh), knobs)
+        result = render.run_blender(script)
     except (ValueError, RuntimeError) as e:
         raise HTTPException(status_code=400, detail=str(e))
-    result = render.run_blender(script)
+    except (FileNotFoundError, OSError) as e:
+        raise HTTPException(status_code=400, detail=f"render failed: {e}")
     if not result.ok:
         raise HTTPException(
             status_code=400, detail=(result.stderr or "render failed")[-500:]

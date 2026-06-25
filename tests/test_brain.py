@@ -13,3 +13,8 @@ def test_parse_knobs_extracts_json_from_prose():
 def test_nl_to_knobs_with_injected_cmd():
     fake = [sys.executable, "-c", 'print("{\\"material\\": \\"metal\\"}")']
     assert brain.nl_to_knobs("anything", claude_cmd=fake) == {"material": "metal"}
+
+def test_nl_to_knobs_missing_binary_returns_empty():
+    # I1: nonexistent binary must not raise; should return {}
+    result = brain.nl_to_knobs("anything", claude_cmd=["/nonexistent-binary-xyz-123"])
+    assert result == {}
