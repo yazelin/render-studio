@@ -1,4 +1,67 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>render-studio</title>
-<h1>render-studio up</h1>
+<style>
+  body { font-family: system-ui; margin: 0; display: flex; height: 100vh; }
+  #left { flex: 1; display: flex; align-items: center; justify-content: center; background: #2a2a2a; }
+  #left img { max-width: 95%; max-height: 95%; }
+  #panel { width: 320px; padding: 12px; border-left: 1px solid #ccc; overflow: auto; }
+  label { display: block; margin: 8px 0 2px; font-size: 13px; }
+  select, input, button { width: 100%; box-sizing: border-box; }
+  #status { font: 12px monospace; color: #555; white-space: pre-wrap; margin-top: 8px; }
+</style>
+<div id="left"><span id="placeholder" style="color:#888">render result</span></div>
+<div id="panel">
+  <label>3D file (stl/obj/gltf/glb/ply/step)</label>
+  <input type="file" id="file">
+  <label>material</label>
+  <select id="material"><option>matte</option><option>plastic</option><option>metal</option><option>clay</option></select>
+  <label>color</label>
+  <input type="color" id="color" value="#9aa0a6">
+  <label>background</label>
+  <select id="background"><option>grey</option><option>white</option><option>dark</option><option>gradient</option></select>
+  <label>angle</label>
+  <select id="angle"><option>iso</option><option>front</option><option>top_front</option><option>back</option></select>
+  <label>resolution</label>
+  <select id="resolution"><option>1024</option><option>2048</option></select>
+  <label>style in words (optional)</label>
+  <input type="text" id="style" placeholder="brushed aluminium, dark bg">
+  <button id="applyStyle">apply style to knobs</button>
+  <button id="render" style="margin-top:10px">render</button>
+  <div id="status"></div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const KNOBS = ["material","color","background","angle","resolution"];
+function status(t){ $("status").textContent = t; }
+
+$("applyStyle").onclick = async () => {
+  const text = $("style").value.trim(); if (!text) return;
+  status("asking claude...");
+  const r = await fetch("/style", {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({text})});
+  const k = await r.json();
+  for (const key of KNOBS) if (k[key] !== undefined) $(key).value = k[key];
+  status("knobs updated from style");
+};
+
+$("render").onclick = async () => {
+  const f = $("file").files[0];
+  if (!f) { status("pick a file first"); return; }
+  const fd = new FormData();
+  fd.append("model", f);
+  for (const key of KNOBS) fd.append(key, $(key).value);
+  status("rendering... (Blender EEVEE, ~10-30s)");
+  const r = await fetch("/render", {method:"POST", body: fd});
+  const j = await r.json();
+  if (j.ok) {
+    $("placeholder").style.display = "none";
+    let img = $("result");
+    if (!img) { img = document.createElement("img"); img.id = "result"; $("left").appendChild(img); }
+    img.src = j.image + "?t=" + Date.now();
+    status("done");
+  } else {
+    status("error: " + (j.detail || JSON.stringify(j)));
+  }
+};
+</script>
