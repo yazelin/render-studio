@@ -29,3 +29,16 @@ def test_agentos_render_failure(tmp_path, monkeypatch):
     r = TestClient(app).post("/agentos/render", json={"stl_path": str(stl)})
     body = r.json()
     assert body["ok"] is False and body["image_path"] is None and "boom" in body["error"]
+
+import json
+
+def test_write_descriptor_content(tmp_path):
+    p = tmp_path / ".mori" / "render-studio.json"
+    srv.write_descriptor(host="127.0.0.1", port=8098, path=p)
+    d = json.loads(p.read_text())
+    assert d == {"contract_version": 1, "host": "127.0.0.1", "port": 8098,
+                 "inference_path": "/agentos/render"}
+
+def test_write_descriptor_best_effort(tmp_path):
+    bad = tmp_path / "afile"; bad.write_text("x")
+    srv.write_descriptor(path=bad / "nope" / "render-studio.json")  # parent is a file

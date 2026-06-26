@@ -1,4 +1,5 @@
 import asyncio
+import json
 import shutil
 import uuid
 from pathlib import Path
@@ -10,6 +11,19 @@ from pydantic import BaseModel
 from . import brain, ingest, render, scene
 from .knobs import coerce
 from .render import DEFAULT_SCRATCH
+
+def write_descriptor(host: str = "127.0.0.1", port: int = 8098,
+                     path: Path | None = None) -> None:
+    # AgentOS http-service descriptor for the render.product skill. Best-effort.
+    target = path or (Path.home() / ".mori" / "render-studio.json")
+    desc = {"contract_version": 1, "host": host, "port": port,
+            "inference_path": "/agentos/render"}
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(desc))
+    except OSError:
+        pass
+
 
 app = FastAPI()
 WEB = Path(__file__).parent / "web"
