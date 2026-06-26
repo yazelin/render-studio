@@ -1,3 +1,4 @@
+import asyncio
 import shutil
 import uuid
 from pathlib import Path
@@ -60,6 +61,34 @@ def style(req: StyleReq) -> dict:
     k = coerce(raw)
     return {"material": k.material, "color": k.color, "background": k.background,
             "angle": k.angle, "resolution": k.resolution}
+
+class AgentosRenderReq(BaseModel):
+    stl_path: str
+    material: str = "matte"
+    color: str = "#9aa0a6"
+    background: str = "grey"
+    angle: str = "iso"
+    resolution: int = 1024
+
+@app.post("/agentos/render")
+async def agentos_render(req: AgentosRenderReq) -> dict:
+    src = Path(req.stl_path)
+    if not src.exists():
+        return {"ok": False, "image_path": None, "error": f"file not found: {req.stl_path}"}
+    knobs = coerce({"material": req.material, "color": req.color,
+                    "background": req.background, "angle": req.angle,
+                    "resolution": req.resolution})
+    workdir = render.DEFAULT_SCRATCH / ("agentos-" + uuid.uuid4().hex[:12])
+    workdir.mkdir(parents=True, exist_ok=True)
+    try:
+        mesh = await asyncio.to_thread(ingest.prepare_mesh, src, workdir)
+        script = scene.build_bpy(str(mesh), knobs)
+    except (ValueError, RuntimeError) as e:
+        return {"ok": False, "image_path": None, "error": str(e)}
+    result = await asyncio.to_thread(render.run_blender, script, scratch_base=workdir)
+    if result.ok and result.image_path:
+        return {"ok": True, "image_path": str(result.image_path), "error": None}
+    return {"ok": False, "image_path": None, "error": (result.stderr or "render failed")[-500:]}
 
 @app.post("/render")
 async def do_render(
